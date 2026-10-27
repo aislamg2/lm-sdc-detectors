@@ -1,0 +1,44 @@
+# Shared experiment configuration. Paths are relative to the repo root.
+
+paths:
+  eurosat_dir: data/EuroSAT_RGB          # ImageFolder root (unzipped EuroSAT_RGB.zip)
+  checkpoint: checkpoints/resnet18_eurosat.pt   # TODO: export from Reem's Colab run
+  tflite_fp32: models/eurosat_fp32.tflite
+  tflite_int8: models/eurosat_int8.tflite
+  splits: runs/splits.json               # fitting / evaluation image ids
+  clean_runs: runs/clean
+  reference_ranges: runs/reference_ranges.json
+  fault_runs: runs/faults                # Parquet shards
+  detector_scores: runs/scores
+  results: results
+
+seed: 42
+
+data:
+  # Must match Reem's notebook so "held-out test split" means the same images.
+  split_fractions: [0.8, 0.1, 0.1]       # train / val / test
+  split_seed: 42
+  images_per_class: null                 # TODO: set after pilot (balanced sampling)
+  fit_fraction: 0.5                      # fitting vs. evaluation, disjoint by image
+
+model:
+  monitored_points: [stem, layer1, layer2, layer3, layer4, fc]
+
+injection:
+  sites: [weight, activation]
+  bit_groups: [sign, exponent, mantissa]
+  injections_per_image: null             # TODO: set after pilot
+  shard_size: 500                        # runs per Parquet shard (resume granularity)
+  timeout_s: 10
+
+lm:
+  model: qwen3-0.6b                      # TODO: 0.6B vs 1.7B after pilot
+  gguf_path: models/qwen3-0.6b-q4.gguf
+  n_ctx: 2048
+  access_levels: [blackbox, whitebox]
+  prompt_conditions: [zero_shot, reference]
+
+eval:
+  target_fpr: 0.05
+  bootstrap_resamples: 1000
+  ci: 0.95

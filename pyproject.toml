@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sdc"
+version = "0.0.1"
+description = "Small language models vs. classical detectors for silent data corruption in a ResNet-18 EuroSAT classifier on a Raspberry Pi 5."
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "torchvision",
+    "pytorchfi",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "scikit-learn",
+    "pyyaml",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+# TFLite / LiteRT conversion (workstation) and inference (Pi).
+tflite = ["ai-edge-litert", "litert-torch"]
+# Language-model detectors via llama.cpp.
+lm = ["llama-cpp-python"]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
