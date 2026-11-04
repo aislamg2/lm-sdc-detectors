@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sdc"
 version = "0.0.1"
 description = "Small language models vs. classical detectors for silent data corruption in a ResNet-18 EuroSAT classifier on a Raspberry Pi 5."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "torch",
     "torchvision",

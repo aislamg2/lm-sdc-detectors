@@ -3,6 +3,7 @@
 paths:
   eurosat_dir: data/EuroSAT_RGB          # ImageFolder root (unzipped EuroSAT_RGB.zip)
   checkpoint: checkpoints/resnet18_eurosat.pt   # TODO: export from Reem's Colab run
+  test_indices: checkpoints/test_indices.json   # optional; else reproduce the seed-42 split
   tflite_fp32: models/eurosat_fp32.tflite
   tflite_int8: models/eurosat_int8.tflite
   qwen_gguf: models/qwen3-0.6b-q4.gguf

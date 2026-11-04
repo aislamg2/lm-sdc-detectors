@@ -1,5 +1,7 @@
 """The monitored ResNet-18 classifier (architecture ported from Reem's notebook)."""
 
+import hashlib
+
 import torch
 from torchvision import models
 
@@ -23,3 +25,9 @@ def load_checkpoint(path: str, device: str = "cpu") -> torch.nn.Module:
     model = build_resnet18()
     model.load_state_dict(state_dict)
     return model.to(device).eval()
+
+
+def checkpoint_sha256(path: str) -> str:
+    """Hash of the checkpoint file, recorded so results can be tied to exact weights."""
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
