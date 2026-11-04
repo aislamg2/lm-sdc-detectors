@@ -3,7 +3,7 @@ Comparing small language models against classical detectors for catching silent 
 
 Reem Shehayib, Micah Brody, Arvin Islam-Gomes (Notre Dame)
 
-> **Status: skeleton.** Most functions are stubs that raise `NotImplementedError` with a TODO describing what to build. The ported pieces from Reem's notebook (transforms, test split, model definition, TFLite conversion) are real code.
+> **Status: in progress, no real results yet.** See **[docs/README.md](docs/README.md)** for full project context: what is built, how it fits together, decisions, known issues, and what is next. Functions not built yet are stubs that raise `NotImplementedError`.
 
 ## Setup
 ```bash
