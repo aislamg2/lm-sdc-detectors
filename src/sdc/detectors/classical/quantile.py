@@ -2,11 +2,12 @@ from sdc.detectors.base import Detector
 
 
 class QuantileMonitor(Detector):
-    """Like RangeCheck but with per-layer quantile bounds (e.g. 0.1% / 99.9%) on
-    each statistic, which is more robust than raw min/max.
+    """Like RangeCheck, but the bounds for layer l are the 0.1% and 99.9% quantiles
+    of its per-run min and max across clean fitting runs, which makes them less
+    sensitive to a single extreme clean run. Needs no fields beyond LayerStats.
 
-    Listed in the planning notes but not yet described in the proposal;
-    TODO: agree on the exact definition and add it to the paper.
+    Listed in the planning notes but not in the proposal.
+    TODO: confirm this definition with the team and add it to the paper.
     """
     name = "quantile"
 
