@@ -19,7 +19,7 @@ from sdc.records.schema import RunRecord
 
 SHARD_PATTERN = re.compile(r"shard_(\d+)\.parquet")
 
-_STAT_COLUMNS = {
+STAT_COLUMNS = {
     "min": pa.float64(), "max": pa.float64(), "mean": pa.float64(),
     "std": pa.float64(), "nonfinite": pa.int64(),
 }
@@ -58,7 +58,7 @@ ARROW_SCHEMA = pa.schema(
     + [
         (f"{point}_{stat}", arrow_type)
         for point in MONITORED_POINTS
-        for stat, arrow_type in _STAT_COLUMNS.items()
+        for stat, arrow_type in STAT_COLUMNS.items()
     ]
     + [
         ("model_format", pa.string()),
@@ -80,7 +80,7 @@ def record_to_row(record: RunRecord) -> dict:
         raise ValueError(f"unknown monitored points: {sorted(unknown)}")
     for point in MONITORED_POINTS:
         stats = layer_stats.get(point, {})
-        for stat in _STAT_COLUMNS:
+        for stat in STAT_COLUMNS:
             row[f"{point}_{stat}"] = stats.get(stat)
     for key in ("fault_site", "bit_group", "label", "crash_reason"):
         if row[key] is not None:
@@ -99,18 +99,23 @@ def write_shard(records: list[RunRecord], out_dir: str | Path, shard_idx: int) -
     out_dir.mkdir(parents=True, exist_ok=True)
 
     table = pa.Table.from_pylist([record_to_row(r) for r in records], schema=ARROW_SCHEMA)
-    temp_path = out_dir / f"{path.name}.tmp"
+    write_table_atomic(table, path)
+    return path
+
+
+def write_table_atomic(table: pa.Table, path: Path) -> None:
+    """Write a Parquet file so it either exists completely or not at all."""
+    temp_path = path.with_name(f"{path.name}.tmp")
     with open(temp_path, "wb") as f:
         pq.write_table(table, f)
         f.flush()
         os.fsync(f.fileno())   # the data must reach the SD card before the rename
     os.replace(temp_path, path)
-    dir_fd = os.open(out_dir, os.O_RDONLY)
+    dir_fd = os.open(path.parent, os.O_RDONLY)
     try:
         os.fsync(dir_fd)   # and so must the rename itself
     finally:
         os.close(dir_fd)
-    return path
 
 
 def completed_shards(out_dir: str | Path) -> set[int]:

@@ -162,6 +162,29 @@ def build_splits(model, test_ds: Subset, per_class: int | None, fit_fraction: fl
     }
 
 
+def load_splits(path: str) -> dict:
+    """Read the file written by scripts/01_make_splits.py."""
+    with open(path) as f:
+        return json.load(f)
+
+
+def verify_splits(splits: dict, test_ds: Subset, checkpoint_hash: str) -> None:
+    """Raise if these weights or images are not the ones the splits were built from."""
+    if splits["checkpoint_sha256"] != checkpoint_hash:
+        raise ValueError("checkpoint differs from the one used to build the splits; rebuild them")
+    for entry in splits["fit"] + splits["eval"]:
+        image_id = entry["image_id"]
+        if not 0 <= image_id < len(test_ds):
+            raise ValueError(f"image_id {image_id} is outside the test split")
+        path, label = test_ds.dataset.samples[test_ds.indices[image_id]]
+        relative = os.path.relpath(path, test_ds.dataset.root)
+        if relative != entry["image_path"] or label != entry["true_class"]:
+            raise ValueError(
+                f"image_id {image_id} is {relative} (class {label}), but the splits say "
+                f"{entry['image_path']} (class {entry['true_class']}): the dataset differs"
+            )
+
+
 def _group_by_class(indices: list[int], labels: list[int], num_classes: int) -> dict[int, list[int]]:
     if len(indices) != len(labels):
         raise ValueError(f"got {len(indices)} indices but {len(labels)} labels")
