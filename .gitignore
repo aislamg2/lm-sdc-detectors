@@ -7,11 +7,11 @@ __pycache__/
 .DS_Store
 
 # Large / generated artifacts: share via Drive, not git.
-data/
-checkpoints/
-models/
-runs/
-results/
+/data/
+/checkpoints/
+/models/
+/runs/
+/results/
 *.pt
 *.pth
 *.tflite
