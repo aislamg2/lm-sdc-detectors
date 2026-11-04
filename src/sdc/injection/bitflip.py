@@ -15,24 +15,25 @@ BIT_GROUP_POSITIONS = {
 
 
 def bit_group_of(bit_position: int) -> BitGroup:
-    """Return the group a bit position belongs to.
-
-    TODO: implement.
-    """
-    raise NotImplementedError
+    """Return the group a bit position belongs to."""
+    for group, positions in BIT_GROUP_POSITIONS.items():
+        if bit_position in positions:
+            return group
+    raise ValueError(f"bit_position must be in 0..31, got {bit_position}")
 
 
 def sample_bit(group: BitGroup, rng: np.random.Generator) -> int:
-    """Sample a bit position uniformly within `group`.
-
-    TODO: implement.
-    """
-    raise NotImplementedError
+    """Sample a bit position uniformly within `group`."""
+    return int(rng.choice(BIT_GROUP_POSITIONS[group]))
 
 
-def flip_bit_fp32(value: float, bit_position: int) -> float:
+def flip_bit_fp32(value: np.floating, bit_position: int) -> np.float32:
     """Return `value` with one bit flipped (view as uint32, XOR, view back).
 
-    TODO: implement.
+    Pass a np.float32 taken directly from the tensor: a Python float is 64-bit,
+    and converting through it can alter the bits of a NaN.
     """
-    raise NotImplementedError
+    if not 0 <= bit_position <= 31:
+        raise ValueError(f"bit_position must be in 0..31, got {bit_position}")
+    bits = np.array(value, dtype=np.float32).view(np.uint32)
+    return (bits ^ np.uint32(1 << bit_position)).view(np.float32)[()]

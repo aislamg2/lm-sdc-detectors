@@ -16,7 +16,10 @@ def build_resnet18(num_classes: int = NUM_CLASSES) -> torch.nn.Module:
 def load_checkpoint(path: str, device: str = "cpu") -> torch.nn.Module:
     """Build the model, load the trained state_dict from `path`, and return it in eval mode.
 
-    TODO: implement once the trained weights are exported from Reem's Colab run
-    (the notebook never saves a .pt; add `torch.save(model.state_dict(), ...)`).
+    The file must be a plain state_dict: `torch.save(model.state_dict(), path)`.
+    The notebook never saves one, so this has to be exported from Reem's Colab run.
     """
-    raise NotImplementedError
+    state_dict = torch.load(path, map_location=device, weights_only=True)
+    model = build_resnet18()
+    model.load_state_dict(state_dict)
+    return model.to(device).eval()

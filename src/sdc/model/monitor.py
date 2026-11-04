@@ -30,15 +30,29 @@ class ActivationMonitor:
     """
 
     def __init__(self, model: torch.nn.Module, points=MONITORED_POINTS):
+        unknown = [p for p in points if p not in POINT_TO_MODULE]
+        if unknown:
+            raise ValueError(f"unknown monitored points: {unknown}")
         self.model = model
         self.points = list(points)
         self.activations: dict[str, torch.Tensor] = {}
         self._handles = []
 
     def __enter__(self):
-        # TODO: register forward hooks on POINT_TO_MODULE[p] that store detached outputs.
-        raise NotImplementedError
+        self.activations = {}
+        # Look up every module first so a bad model leaves no hooks behind.
+        modules = {p: self.model.get_submodule(POINT_TO_MODULE[p]) for p in self.points}
+        for point, module in modules.items():
+            self._handles.append(module.register_forward_hook(self._capture(point)))
+        return self
 
     def __exit__(self, *exc):
-        # TODO: remove all hook handles.
-        raise NotImplementedError
+        # Runs after a crash too: a leftover hook would contaminate later runs.
+        for handle in self._handles:
+            handle.remove()
+        self._handles = []
+
+    def _capture(self, point: str):
+        def hook(module, inputs, output):
+            self.activations[point] = output.detach()
+        return hook

@@ -5,6 +5,7 @@ paths:
   checkpoint: checkpoints/resnet18_eurosat.pt   # TODO: export from Reem's Colab run
   tflite_fp32: models/eurosat_fp32.tflite
   tflite_int8: models/eurosat_int8.tflite
+  qwen_gguf: models/qwen3-0.6b-q4.gguf
   splits: runs/splits.json               # fitting / evaluation image ids
   clean_runs: runs/clean
   reference_ranges: runs/reference_ranges.json
@@ -13,6 +14,7 @@ paths:
   results: results
 
 seed: 42
+device: cpu
 
 data:
   # Must match Reem's notebook so "held-out test split" means the same images.
@@ -33,7 +35,6 @@ injection:
 
 lm:
   model: qwen3-0.6b                      # TODO: 0.6B vs 1.7B after pilot
-  gguf_path: models/qwen3-0.6b-q4.gguf
   n_ctx: 2048
   access_levels: [blackbox, whitebox]
   prompt_conditions: [zero_shot, reference]
