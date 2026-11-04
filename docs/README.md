@@ -1,6 +1,6 @@
 # Project status and context
 
-**Last updated: 2026-11-04, through the campaign loop (`campaign.py` and `scripts/05_inject.py`).**
+**Last updated: 2026-11-04, at commit `2091728` on `main`, which includes the campaign loop.**
 
 This is the single place to get up to speed on `lm-sdc-detectors`: what the project is, what has been built, how it fits together, what was decided and why, and what is left. It is written for teammates and for AI agents picking up the work. If something here disagrees with the code, trust the code and fix this file.
 
@@ -24,8 +24,8 @@ This is the single place to get up to speed on `lm-sdc-detectors`: what the proj
 ## 1. Current status in brief
 
 - **No real results exist yet.** Everything has been tested only on fake images, made-up records, and randomly initialized ResNet-18 weights, on a Mac. Nothing has run on a Raspberry Pi.
-- **The main blocker is three files from Reem:** the trained checkpoint, `test_indices.json`, and the EuroSAT zip she trained on. See [section 9](#9-known-issues-and-things-to-watch).
-- **Built and tested:** bit flips, run labeling, observation stats, activation monitoring, checkpoint and config loading, the frozen run-record schema, Parquet shard I/O, image splits, clean runs, reference ranges, and weight and activation fault injection, and the resumable campaign loop.
+- **The main blocker is three files from Reem:** the trained checkpoint, `test_indices.json`, and the EuroSAT zip used for training. See [section 9](#9-known-issues-and-things-to-watch).
+- **Built and tested:** bit flips, run labeling, observation stats, activation monitoring, checkpoint and config loading, the frozen run-record schema, Parquet shard I/O, image splits, clean runs, reference ranges, weight and activation fault injection, and the resumable campaign loop.
 - **The real campaign has not been run.** It needs Reem's files, real splits and clean runs, and the pilot's choice of `injections_per_image`.
 - **Not built yet:** the pilot, all detectors, evaluation metrics, and overhead measurement.
 - **Tests:** 461 passing.
