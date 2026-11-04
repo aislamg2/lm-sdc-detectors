@@ -1,6 +1,6 @@
 # Project status and context
 
-**Last updated: 2026-11-03, at commit `05caa71` on `main`.**
+**Last updated: 2026-11-04, through the campaign loop (`campaign.py` and `scripts/05_inject.py`).**
 
 This is the single place to get up to speed on `lm-sdc-detectors`: what the project is, what has been built, how it fits together, what was decided and why, and what is left. It is written for teammates and for AI agents picking up the work. If something here disagrees with the code, trust the code and fix this file.
 
@@ -25,9 +25,10 @@ This is the single place to get up to speed on `lm-sdc-detectors`: what the proj
 
 - **No real results exist yet.** Everything has been tested only on fake images, made-up records, and randomly initialized ResNet-18 weights, on a Mac. Nothing has run on a Raspberry Pi.
 - **The main blocker is three files from Reem:** the trained checkpoint, `test_indices.json`, and the EuroSAT zip she trained on. See [section 9](#9-known-issues-and-things-to-watch).
-- **Built and tested:** bit flips, run labeling, observation stats, activation monitoring, checkpoint and config loading, the frozen run-record schema, Parquet shard I/O, image splits, clean runs, reference ranges, and weight and activation fault injection.
-- **Not built yet:** the campaign loop (`campaign.py`, `scripts/05_inject.py`), the pilot, all detectors, evaluation metrics, and overhead measurement.
-- **Tests:** 426 passing.
+- **Built and tested:** bit flips, run labeling, observation stats, activation monitoring, checkpoint and config loading, the frozen run-record schema, Parquet shard I/O, image splits, clean runs, reference ranges, and weight and activation fault injection, and the resumable campaign loop.
+- **The real campaign has not been run.** It needs Reem's files, real splits and clean runs, and the pilot's choice of `injections_per_image`.
+- **Not built yet:** the pilot, all detectors, evaluation metrics, and overhead measurement.
+- **Tests:** 461 passing.
 
 ---
 
@@ -90,7 +91,7 @@ This is the single place to get up to speed on `lm-sdc-detectors`: what the proj
 | Split images into fitting and evaluation sets | Code done | Run on real data |
 | Run clean inference, keep correct images | Code done | Run on real data |
 | Compute normal ranges from the fitting set | Code done | Run on real data |
-| Build the resumable injection loop | Partly done | `faults.py` is done; `campaign.py`, `05_inject.py`, and the resume check are not |
+| Build the resumable injection loop | Code done | Tested with `kill -9` on fake data; not yet run on real data or on the Pi |
 
 ### Later items
 
@@ -117,7 +118,7 @@ Reem's files: checkpoint, test_indices.json, EuroSAT
         |
 04_pilot              [stub]  sets injections per image, LM size, subsampling
         |
-05_inject             [stub]  -> runs/faults/... Parquet shards   (fit and eval)
+05_inject             [done]  -> runs/faults/fit, eval: Parquet shards, campaign.json
         |
 06_score_classical    [stub]  -> runs/scores/
 07_score_lm           [stub]  -> runs/scores/
@@ -127,13 +128,15 @@ Reem's files: checkpoint, test_indices.json, EuroSAT
 09_overhead           [stub]  separate session on the Pi
 ```
 
-**One faulty run, as planned for the campaign.** Most of these pieces exist; the loop connecting them doesn't yet.
+**One faulty run** (`run_one` in `campaign.py`):
 1. `sample_fault` picks the layer, element, and bit.
 2. `weight_fault` or `ActivationInjector.inject` applies the fault.
 3. The model runs on one image with `ActivationMonitor` attached.
 4. `blackbox_stats` and `whitebox_stats` build the observation.
 5. `label_run` assigns `masked`, `sdc`, or `crash`.
 6. A `RunRecord` is built, and `write_shard` saves batches of them.
+
+**The campaign** (`run_campaign`) verifies its inputs, builds the deterministic plan, checks `campaign.json`, then runs each unfinished shard. Before saving a shard, it checks that the weights are bit-for-bit unchanged.
 
 ---
 
@@ -147,6 +150,7 @@ Tests are in `tests/`, in a file named after the module.
 | `src/sdc/injection/bitflip.py` | `bit_group_of`, `sample_bit`, `flip_bit_fp32`. Bit 31 is sign, 30–23 exponent, 22–0 mantissa | 237 |
 | `src/sdc/injection/labeling.py` | `label_run(clean_pred, faulty_logits, crashed)` | 12 |
 | `src/sdc/injection/faults.py` | `injectable_layers`, `weight_shapes`, `activation_shapes`, `sample_fault`, `weight_fault`, `ActivationInjector` | 34 |
+| `src/sdc/injection/campaign.py` | `plan_faults`, `plan_hash`, `run_one`, `run_campaign`, `time_limit`, `weights_fingerprint`, `current_git_commit` | 35 |
 | `src/sdc/model/resnet18.py` | `build_resnet18`, `load_checkpoint`, `checkpoint_sha256` | 10 |
 | `src/sdc/model/monitor.py` | `MONITORED_POINTS`, `ActivationMonitor` (forward hooks, removed even after a crash) | 14 |
 | `src/sdc/observations/stats.py` | `blackbox_stats`, `layer_stats`, `whitebox_stats`, `reference_ranges` | 17 + 14 |
@@ -157,17 +161,17 @@ Tests are in `tests/`, in a file named after the module.
 | `scripts/01_make_splits.py` | Writes `runs/splits.json` | In `test_eurosat.py` |
 | `scripts/02_clean_runs.py` | Writes the clean Parquet files | In `test_clean_runs.py` |
 | `scripts/03_reference_ranges.py` | Writes `runs/reference_ranges.json` | In `test_reference_ranges.py` |
+| `scripts/05_inject.py` | Runs the campaign and prints label counts. Options: `--split fit\|eval\|all`, `--max-shards N` | In `test_campaign.py` |
 | `tests/test_imports.py` | Smoke test: every module imports | 1 |
 
 **Ported from Reem's notebook.** The transforms, the seed-42 split, and the model definition are in use and tested. `convert_fp32` and `convert_int8` in `src/sdc/model/tflite.py` were ported but **have never been run** in this repo. The original notebook is at `notebooks/reem_TFLite_EuroSAT_ResNet18.ipynb`, from [reemshehayib/TFLite-Deployment-of-ResNet18-on-EuroSAT-Dataset](https://github.com/reemshehayib/TFLite-Deployment-of-ResNet18-on-EuroSAT-Dataset).
 
 **Still stubs:**
-- `src/sdc/injection/campaign.py`
 - `src/sdc/observations/serialize.py`, plus `feature_vector` in `stats.py`
 - `src/sdc/detectors/` (all of it, including `freeze_threshold` in `base.py`)
 - `src/sdc/eval/` and `src/sdc/overhead/`
 - `load_interpreter`, `run_tflite`, and `check_layer_alignment` in `src/sdc/model/tflite.py`
-- `scripts/00`, `04`, `05`, `06`, `07`, `08`, and `09`
+- `scripts/00`, `04`, `06`, `07`, `08`, and `09`
 
 ---
 
@@ -219,8 +223,12 @@ One row per image, with these columns:
 - `min` and `max` are `a_l` and `b_l` in the proposal's Eq. 1: the lowest per-run min and highest per-run max across clean fitting runs.
 - `quantile_low` is the 0.1% quantile of per-run mins, and `quantile_high` is the 99.9% quantile of per-run maxes.
 
-### Fault run shards: `shard_000123.parquet`
-Written with `write_shard`. These are the frozen `RunRecord` fields (`SCHEMA_VERSION = 1`) with `layer_stats` flattened into columns:
+### Fault runs: `runs/faults/fit/` and `runs/faults/eval/`
+Each folder holds `campaign.json` and `shard_000123.parquet` files. Shard `k` always covers the same runs.
+
+`campaign.json` records `schema_version`, `split`, `seed`, `injections_per_image`, `sites`, `bit_groups`, `shard_size`, `checkpoint_sha256`, `plan_hash`, `num_runs`, and `num_shards`. If any of these differ on resume, the campaign stops.
+
+Shards are written with `write_shard`. These are the frozen `RunRecord` fields (`SCHEMA_VERSION = 1`) with `layer_stats` flattened into columns:
 
 | Group | Fields |
 |---|---|
@@ -236,6 +244,7 @@ Written with `write_shard`. These are the frozen `RunRecord` fields (`SCHEMA_VER
 - `crash_reason` is `exception`, `timeout`, `nonfinite`, or empty.
 - **NaN and empty mean different things.** NaN means a value was computed and was bad. Empty means no value exists, for example at a point a crashed run never reached. `load_runs` and `load_clean_runs` return Arrow-backed columns that keep them apart, so `isna()` is true only for empty values.
 - For scikit-learn and NumPy, convert with `.to_numpy(dtype=float)`.
+- `git_commit` ends in `-dirty` if the code had uncommitted changes. Commit before a real campaign so results can be traced to exact code.
 
 **Kept out of the run record on purpose:** clean runs (their own table, joined on `image_id`), detector scores (their own table, joined on `run_id`), and raw activations and LM hidden states (too large).
 
@@ -258,6 +267,9 @@ Written with `write_shard`. These are the frozen `RunRecord` fields (`SCHEMA_VER
 | Save 10 raw logits, not probabilities | Probabilities can be computed from logits, but very confident outputs can't be converted back |
 | Parquet shards with one fixed layout | A shard with no crashes still has typed columns, so all shards combine cleanly |
 | Shards are written to a temp file, synced, then renamed | A shard either exists completely or not at all, which is what makes resuming safe |
+| Each fault has its own random generator, seeded by its position in the plan | The plan is repeatable, and one image's faults don't depend on the others |
+| Exceptions during inference become crash records, but errors while setting up a fault stop the campaign | A fault can cause the first, while the second is a bug. A shard where every run raises an exception also stops |
+| The time limit sits inside `weight_fault` | The alarm can't interrupt the weight restore |
 | Results files are never overwritten | Later results depend on them. Delete a file by hand to rebuild it |
 | Reference ranges read only `fit.parquet` | Using eval data would leak it into the detectors. A test enforces this |
 | Each image is listed with its path, class, and checkpoint hash | Catches a different dataset or different weights instead of silently using them |
@@ -286,7 +298,8 @@ These need to be reflected in the paper, or changed if the team disagrees.
 
 **Not yet verified:**
 - **PyTorchFI on the Pi.** Version 0.6.0 works on torch 2.15 on a Mac, for activation injection through our custom hook. Its own weight injection was never tried, because we don't use it.
-- **Real power loss.** Failed writes are simulated with an error. There's been no real power-cut test.
+- **Real power loss.** `kill -9` on fake data lost nothing and resumed to identical results, except for time fields. That stops the process but isn't a real power cut, and that test's kill landed just after a shard finished.
+- **Timeouts on real hangs.** `signal.setitimer` is tested against a slow Python hook. It can't interrupt a hang inside one compiled operation, and it only works in the main thread on macOS and Linux.
 - **Per-fault cost on the Pi.** PyTorchFI copies the model per activation fault, which took about 9 ms on a Mac. The pilot will measure the Pi.
 - **The format of `test_indices.json`.** A plain list of full-dataset indices is assumed. A list of the wrong kind of numbers wouldn't be caught.
 - **The TFLite conversion code**, which has never been run here.
@@ -303,7 +316,7 @@ These need to be reflected in the paper, or changed if the team disagrees.
 - **Reem's training had no augmentation.** All three subsets share one dataset object in the notebook, so the eval transform also applied during training. This doesn't affect this repo's split, but Reem may want to know.
 - **Reem's repo has no license file.** Get an OK from Reem for reusing the code.
 - **Package versions aren't pinned** in `pyproject.toml`. Pin them before the main campaign so all runs use the same software.
-- **Scripts `04`–`09` and `00` still use a relative `--config` default.** Scripts `01`–`03` use `None`, and the rest should match when they're implemented.
+- **Scripts `00`, `04`, and `06`–`09` still use a relative `--config` default.** Scripts `01`–`03` and `05` use `None`, and the rest should match when they're implemented.
 - **The config setting was renamed:** `lm.gguf_path` is now `paths.qwen_gguf`. Micah should know.
 
 ---
@@ -358,6 +371,14 @@ python scripts/02_clean_runs.py
 python scripts/03_reference_ranges.py
 ```
 
+The campaign comes after the pilot, once `injection.injections_per_image` is set:
+
+```bash
+python scripts/05_inject.py
+```
+
+Stop it at any time and run the same command to resume.
+
 Each script takes `--config some_overlay.yaml` to override settings in `configs/default.yaml`. Unknown keys in an overlay raise an error, so typos can't pass silently.
 
 ---
@@ -365,21 +386,12 @@ Each script takes `--config some_overlay.yaml` to override settings in `configs/
 ## 12. What is next
 
 **Now, no real data needed:**
-1. Write `src/sdc/injection/campaign.py`. The plan:
-   - `plan_faults` builds a deterministic fault list from the seed. Each image gets `injections_per_image` faults per combination of site and bit group, so 6 combinations per injection.
-   - `run_one` does one run and returns a `RunRecord`. Exceptions and timeouts become `crash` records rather than stopping the campaign.
-   - `run_campaign` runs in shards and skips finished ones. Shard `k` always covers the same runs.
-   - A saved `campaign.json` holds the seed, settings, checkpoint hash, and plan hash. Resuming with anything different stops with an error.
-   - A weights hash is checked at each shard, to catch a fault that wasn't restored.
-   - Each split gets its own folder: `runs/faults/fit/` and `runs/faults/eval/`.
-   - Timeouts would use `signal.alarm`, which may not interrupt a hang deep in compiled code, so this needs testing.
-2. Write `scripts/05_inject.py`, and run a check with `injections_per_image=1` on about 20 images: interrupt it, resume it, and summarize the masked, SDC, and crash counts. On fake data this proves the machinery only, not a real SDC rate.
-3. Build the classical detectors and evaluation metrics, tested on fake records.
+1. Build the classical detectors and evaluation metrics, tested on fake records.
 
 **When Reem's files arrive:**
-4. Run scripts `01`–`03` and check `clean_accuracy`. Runs made with random weights must be thrown away.
-5. Run the pilot, set `injections_per_image`, and choose the language-model size.
-6. Get team sign-off on [section 10](#10-open-questions-for-the-team), then run the full campaign.
+2. Run scripts `01`–`03` and check `clean_accuracy`. Runs made with random weights must be thrown away.
+3. Write and run the pilot (`scripts/04_pilot.py` is still a stub), set `injections_per_image`, and choose the language-model size.
+4. Get team sign-off on [section 10](#10-open-questions-for-the-team), then run the full campaign.
 
 **In parallel:**
 - Micah: Qwen3 in llama.cpp on the Pi, confirming that yes/no probabilities and hidden states can be read.
