@@ -11,9 +11,14 @@ in float32, which would make finite activations look non-finite.
 import math
 
 import numpy as np
+import pandas as pd
 import torch
 
+from sdc.model.monitor import MONITORED_POINTS
 from sdc.records.schema import LayerStats
+
+QUANTILE_LOW = 0.001
+QUANTILE_HIGH = 0.999
 
 
 def blackbox_stats(logits: torch.Tensor) -> dict[str, float]:
@@ -68,10 +73,27 @@ def feature_vector(record_row: dict, access_level: str) -> np.ndarray:
     raise NotImplementedError
 
 
-def reference_ranges(fit_clean_runs) -> dict[str, dict[str, float]]:
-    """Per-layer (a_l, b_l) min/max over fault-free runs in the fitting set.
+def reference_ranges(fit_clean_runs: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """Per-layer normal ranges over fault-free runs in the fitting set.
 
-    Used by the range check and by the LM "reference" prompt condition.
-    TODO: implement (Action item: "Compute normal ranges from the fitting set").
+    "min"/"max" are (a_l, b_l) for the range check and the LM "reference" prompt.
+    "quantile_low"/"quantile_high" are the quantile monitor's bounds: the 0.1% quantile
+    of per-run mins and the 99.9% quantile of per-run maxes.
+
+    Raises on no runs or on non-finite values: a clean run should never have them.
     """
-    raise NotImplementedError
+    if len(fit_clean_runs) == 0:
+        raise ValueError("no clean runs to compute ranges from")
+    ranges = {}
+    for point in MONITORED_POINTS:
+        if fit_clean_runs[f"{point}_nonfinite"].sum() > 0:
+            raise ValueError(f"clean runs have non-finite values at {point}")
+        run_mins = fit_clean_runs[f"{point}_min"].to_numpy(dtype=float)
+        run_maxes = fit_clean_runs[f"{point}_max"].to_numpy(dtype=float)
+        ranges[point] = {
+            "min": float(run_mins.min()),
+            "max": float(run_maxes.max()),
+            "quantile_low": float(np.quantile(run_mins, QUANTILE_LOW)),
+            "quantile_high": float(np.quantile(run_maxes, QUANTILE_HIGH)),
+        }
+    return ranges
